@@ -10,25 +10,25 @@
     <h2>U.S. Average Annual Near Surface Temperature (TAS) by State</h2>
 
     <dl>
-      <dt>Model:</dt>
+      <dt><strong>Model:</strong></dt>
       <dd>
         <select id="modelSelect"></select>
       </dd>
       <dt>
-        Year: 
-        <span id="yearLabel"></span>
+        <strong>Year: <span id="yearLabel"></span></strong>
       </dt>
       <dd>
         <input type="range" id="yearSlider" min="2015" max="2100" step="1" />
       </dd>
-      <!-- <dt>Lengend:</dt> -->
-      <dd>
-        <div id="legend"></div>
-      </dd>
     </dl>
 
-    <div id="chart"></div>
-    <h2 id="state-name">Click a state to see temperature data aggregated by the chosen state</h2>
+    <div class="container">
+      <svg id="chart"></svg>
+      <svg id="legend"></svg>
+    </div>
+    <h2 id="state-name">
+      Click a state to see temperature data aggregated by the chosen state
+    </h2>
     <div id="state-chart"></div>
     <div id="tooltip"></div>
     <!-- <svg id="map" width="1000" height="600"></svg> -->

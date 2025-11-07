@@ -16,7 +16,6 @@ const width = 1000,
 
 const svg = d3
   .select("#chart")
-  .append("svg")
   .attr("viewBox", `0 0 ${width} ${height}`)
   .style("overflow", "visible");
 
@@ -163,11 +162,11 @@ Promise.all([d3.json(geoURL), d3.csv(dataURL)]).then(([geo, data]) => {
   // interactions
   modelSelect.on("change", (event) => {
     update();
-    if(plotName){
-        const filtered = data.filter(
-          (d) => d.model === event.target.value && d.state === plotName
-        );
-        subplot(filtered);
+    if (plotName) {
+      const filtered = data.filter(
+        (d) => d.model === event.target.value && d.state === plotName
+      );
+      subplot(filtered);
     }
   });
   d3.select("#yearSlider").on("input", update);
@@ -176,57 +175,56 @@ Promise.all([d3.json(geoURL), d3.csv(dataURL)]).then(([geo, data]) => {
 
 // color = d3.scaleQuantile() or d3.scaleThreshold()
 
-function makeLegend(scale) {
-  const thresholds = scale.domain(); // 9 domain breaks
-  const colors = scale.range(); // 10 colors
+function makeLegend(colorScale) {
+  const domain = colorScale.domain(); // 9 thresholds
+  const range = colorScale.range(); // 10 colors
 
-  const w = 350;
-  const h = 15;
-  const boxWidth = w / colors.length;
+  const boxH = 22; // height of each color box
+  const boxW = 25;
+  const labelOffset = 35;
 
-  const svgLegend = d3
+  const svgLengend = d3
     .select("#legend")
-    .html("")
-    .append("svg")
-    .attr("width", w + 50) // give margin for labels
-    .attr("height", h + 50);
+    .attr("width", 100 + labelOffset)
+    .attr("height", range.length * boxH)
+    .style("overflow", "visible");
 
-  // colored boxes
-  svgLegend
-    .selectAll("rect")
-    .data(colors)
-    .join("rect")
-    .attr("x", (d, i) => i * boxWidth + 40) // 40px left margin
-    .attr("y", 0)
-    .attr("width", boxWidth)
-    .attr("height", h)
-    .attr("fill", (d) => d);
+  // group (for top margin)
+  const g = svgLengend.append("g").attr("transform", "translate(30,20)");
 
-  // scale for ticks
-  const x = d3
-    .scaleLinear()
-    .domain([thresholds[0], thresholds[thresholds.length - 1]])
-    .range([40, w + 40]);
+  // draw each box + tick label
+  range.forEach((color, i) => {
+    g.append("rect")
+      .attr("x", 0)
+      .attr("y", (range.length - i - 1) * boxH)
+      .attr("width", boxW)
+      .attr("height", boxH)
+      .attr("fill", color)
+      .attr("stroke", "#333");
 
-  // axis
-  const axis = d3
-    .axisBottom(x)
-    .tickValues(thresholds)
-    .tickFormat(d3.format("d"));
+    // label: use threshold boundary for the lower edge except first/last
+    let label;
+    if (i === 0) {
+      label = "< " + domain[0];
+    } else if (i === range.length - 1) {
+      label = "> " + domain[domain.length - 1];
+    } else {
+      label = domain[i - 1] + " to " + domain[i];
+    }
 
-  svgLegend
-    .append("g")
-    .attr("transform", `translate(0,${h})`)
-    .call(axis)
-    .selectAll("text")
-    .attr("dy", "1em") // push labels down a bit
-    .style("font-size", "10px");
+    g.append("text")
+      .attr("x", boxW + 5)
+      .attr("y", (range.length - i - 1) * boxH + boxH / 1.5)
+      .style("font-size", "11px")
+      .text(label);
+  });
 
-  svgLegend
+  // title
+  svgLengend
     .append("text")
-    .attr("x", w / 2 + 40)
-    .attr("y", h + 35)
-    .attr("text-anchor", "middle")
+    .attr("x", 0)
+    .attr("y", 12)
+    .style("font-weight", "bold")
     .style("font-size", "11px")
     .text("Temperature (°C)");
 }
