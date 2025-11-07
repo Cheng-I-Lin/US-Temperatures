@@ -1,0 +1,89 @@
+:root {
+    --slider-color: #a3cefc;
+  }
+body {
+  font-family: sans-serif;
+  margin-inline: max(1em, (100% - 100ch) / 2);
+}
+#tooltip {
+  position: fixed;
+  background: white;
+  border: 1px solid #ccc;
+  padding: 6px;
+  display: none;
+  pointer-events: none;
+  font-size: 12px;
+}
+dl {
+  display: grid;
+  grid-template-columns: repeat(auto, 1fr);
+  column-gap: 1em;
+  dt {
+    grid-row: 1;
+  }
+  dd {
+    grid-row: 2;
+    font-size: 2em;
+    margin: 0;
+  }
+}
+select {
+  /* Basic styling for the select box */
+  background-color: #f0f0f0;
+  border: 1px solid black;
+  padding: 0.5em;
+  border-radius: 4px;
+  font-family: Arial, sans-serif;
+  font-size: 16px;
+  color: #333;
+
+  /* Hiding the default arrow (browser-specific) */
+  -webkit-appearance: none; /* For Chrome, Safari */
+  -moz-appearance: none; /* For Firefox */
+  appearance: none; /* Standard property */
+}
+
+select:hover {
+  outline: none; /* Remove default focus outline */
+  background-color: #bfddfd;
+}
+input[type="range"] {
+  -webkit-appearance: none; /* For Chrome, Safari, Opera */
+  -moz-appearance: none; /* For Firefox */
+  appearance: none; /* Standard property */
+  width: 90%; /* Adjust as needed */
+  background: transparent; /* Remove default background */
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 20px; /* Set desired height */
+  width: 20px; /* Set desired width */
+  border-radius: 50%; /* Make it a circle */
+  background: var(--slider-color); /* Set desired color */
+  cursor: pointer;
+  margin-top: -7px; /* Adjust to center vertically on the track */
+  border: 1px solid black;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 8px; /* Set desired height */
+  background: #ddd; /* Set desired background color */
+  border-radius: 4px; /* Round the corners */
+  box-shadow: 0 0 2px black;
+}
+
+input[type="range"]:hover {
+    --slider-color: #007bff;
+}
+
+.states {
+  transition: 200ms;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+.states:hover {
+  transform: scale(1.5);
+}
