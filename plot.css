@@ -94,7 +94,7 @@ input[type="range"]:hover {
 }
 
 .states:hover {
-  transform: scale(1.5);
+  /*transform: scale(1.5);*/
 }
 
 .container {

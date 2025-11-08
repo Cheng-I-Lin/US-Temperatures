@@ -32,7 +32,7 @@ const geoURL =
   "https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json";
 const dataURL = "avg_states_model.csv"; // <-- your CSV filename
 
-var plotName;
+var plotName, legendColor;
 
 Promise.all([d3.json(geoURL), d3.csv(dataURL)]).then(([geo, data]) => {
   // cast numeric
@@ -95,6 +95,7 @@ Promise.all([d3.json(geoURL), d3.csv(dataURL)]).then(([geo, data]) => {
     .attr("transform", `scale(1, -1) translate(0, -${height})`);
   //console.log(geo.features);
 
+  let legendHover;
   const states = g
     .selectAll("path")
     .data(mainlandStates)
@@ -104,14 +105,20 @@ Promise.all([d3.json(geoURL), d3.csv(dataURL)]).then(([geo, data]) => {
     .attr("stroke-width", 0.5)
     .attr("class", "states")
     .on("mouseenter", (event) => {
-      d3.select(event.currentTarget)
-        //.style("fill-opacity", 1)
-        .style("stroke-width", 1);
+      hoverOver(event.currentTarget);
+      let hoverColor=event.currentTarget.getAttribute('fill');
+      d3.select("#legend").selectAll('rect').nodes().forEach((d)=>{
+        if(d.getAttribute('fill')===hoverColor){
+          hoverOver(d);
+          legendHover=d;
+        }
+      });
     })
     .on("mouseleave", (event) => {
-      d3.select(event.currentTarget)
-        //.style("fill-opacity", 0.7)
-        .style("stroke-width", 0.5);
+      hoverOut(event.currentTarget);
+      if(legendHover){
+        hoverOut(legendHover);
+      }
     });
 
   function update() {
@@ -175,6 +182,18 @@ Promise.all([d3.json(geoURL), d3.csv(dataURL)]).then(([geo, data]) => {
 
 // color = d3.scaleQuantile() or d3.scaleThreshold()
 
+function hoverOver(target) {
+  d3.select(target)
+    .style("fill-opacity", 1)
+    .style("stroke-width", 1);
+}
+
+function hoverOut(target) {
+  d3.select(target)
+    .style("fill-opacity", 0.7)
+    .style("stroke-width", 0.5);
+}
+
 function makeLegend(colorScale) {
   const domain = colorScale.domain(); // 9 thresholds
   const range = colorScale.range(); // 10 colors
@@ -191,6 +210,7 @@ function makeLegend(colorScale) {
 
   // group (for top margin)
   const g = svgLengend.append("g").attr("transform", "translate(30,20)");
+  let legendHover=[];
 
   // draw each box + tick label
   range.forEach((color, i) => {
@@ -200,7 +220,26 @@ function makeLegend(colorScale) {
       .attr("width", boxW)
       .attr("height", boxH)
       .attr("fill", color)
-      .attr("stroke", "#333");
+      .style("fill-opacity", 0.7)
+      .attr("stroke", "#333")
+      .style("stroke-width", 0.5)
+      .attr("class", "states")
+      .on("mouseenter", (event) => {
+        hoverOver(event.currentTarget);
+        d3.select("#chart").selectAll('path').nodes().forEach((d)=>{
+          if(d.getAttribute('fill')===color){
+            hoverOver(d);
+            legendHover.push(d);
+          }
+        });
+      })
+      .on("mouseleave", (event) => {
+        hoverOut(event.currentTarget);
+        legendHover.forEach((c)=>{
+          hoverOut(c);
+        });
+        legendHover=[];
+      });
 
     // label: use threshold boundary for the lower edge except first/last
     let label;
