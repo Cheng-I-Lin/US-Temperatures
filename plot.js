@@ -172,22 +172,24 @@ Promise.all([d3.json(geoURL), d3.csv(dataURL)]).then(([geo, data]) => {
         subplot(filtered);
 
         //console.log(event.currentTarget);
-        if (selectedState.length == 0) {
-          selectedState.push(event.currentTarget);
-        }
-        if (isSelected) {
-          if (event.currentTarget.classList.contains("selected")) {
-            event.currentTarget.classList.remove("selected");
-            isSelected = false;
-            selectState();
-            selectedState.pop();
+        if (event.currentTarget.getAttribute("fill") != "#ccc") {
+          if (selectedState.length == 0) {
+            selectedState.push(event.currentTarget);
           }
-        } else {
-          if (!event.currentTarget.classList.contains("selected")) {
-            event.currentTarget.classList.add("selected");
-            isSelected = true;
-            selectState();
-            moveStateToLeft(selectedState[0]);
+          if (isSelected) {
+            if (event.currentTarget.classList.contains("selected")) {
+              event.currentTarget.classList.remove("selected");
+              isSelected = false;
+              selectState();
+              selectedState.pop();
+            }
+          } else {
+            if (!event.currentTarget.classList.contains("selected")) {
+              event.currentTarget.classList.add("selected");
+              isSelected = true;
+              selectState();
+              moveStateToLeft(selectedState[0]);
+            }
           }
         }
       });
@@ -355,55 +357,74 @@ function subplot(stateData) {
 function moveStateToLeft(selection) {
   const container = d3.select("#chart");
   const containerWidth = container.node().getBoundingClientRect().width;
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
 
+  // Calculate target position as percentage of viewport (vw)
+  const targetXPercent = 5; // 5% from left of viewport
+  const targetX = (viewportWidth * targetXPercent) / 100;
+
+  // For Y, you can use vh or keep as fixed percentage of viewport height
+  const targetYPercent = 37.5; // 37.5% from top of viewport
+  const targetY = (viewportHeight * targetYPercent) / 100;
+
+  /*
   // Calculate target position as percentage of container
   const targetX = containerWidth * 0.1; // 10% from left
-  const targetY = 300; // Fixed y or calculate dynamically
+  const targetY = 300; // Fixed y or calculate dynamically*/
 
   // Get state's bounding box
   const bbox = selection.getBBox();
   const currentCenterX = bbox.x + bbox.width / 2;
   const currentCenterY = bbox.y + bbox.height / 2;
 
-  const translateX = targetX - currentCenterX;
-  const translateY = targetY - currentCenterY;
+  // const translateX = targetX - currentCenterX;
+  // const translateY = targetY - currentCenterY;
+
+  // Calculate translation in pixels first
+  const translateXPixels = targetX - currentCenterX;
+  const translateYPixels = targetY - currentCenterY;
+
+  // Convert pixels to viewport units
+  const translateXvw = (translateXPixels / viewportWidth) * 100;
+  const translateYvh = (translateYPixels / viewportHeight) * 100;
 
   const selectClass = document.querySelector(".selected");
 
   let offset = 0;
   switch (plotName) {
-    case "California":
-      offset = 75;
-      break;
     case "Montana":
     case "Texas":
-      offset = 100;
+      offset = 5;
       break;
+    case "Iowa":
+    case "Missouri":
     case "Nevada":
     case "Idaho":
     case "New York":
-      offset = 50;
+      offset = 2.5;
       break;
-    case "Utah":
-      offset = 30;
-      break;
+    case "Illinois":
+    case "Wisconsin":
+    case "Pennsylvania":
     case "Arizona":
     case "New Mexico":
-      offset = 40;
+      offset = 2;
       break;
     case "Oregon":
     case "Washington":
     case "Colorado":
     case "Minnesota":
     case "Wyoming":
-      offset = 60;
+      offset = 3.5;
       break;
     case "Oklahoma":
     case "Nebraska":
     case "Florida":
     case "North Carolina":
-      offset = 80;
+      offset = 4.25;
       break;
+    case "California":
     case "Kansas":
     case "South Dakota":
     case "North Dakota":
@@ -411,41 +432,33 @@ function moveStateToLeft(selection) {
     case "Michigan":
     case "Kentucky":
     case "Virginia":
-      offset = 70;
+      offset = 4;
       break;
-    case "Iowa":
-    case "Missouri":
-      offset = 50;
-      break;
+    case "Utah":
     case "Arkansas":
     case "Louisiana":
     case "Mississippi":
-      offset = 30;
-      break;
-    case "Illinois":
-    case "Wisconsin":
-    case "Pennsylvania":
-      offset = 40;
-      break;
-    case "Indiana":
-    case "Massachusetts":
-    case "Maine":
-      offset = 20;
-      break;
     case "Alabama":
     case "Georgia":
     case "South Carolina":
     case "West Virginia":
     case "Ohio":
     case "Maryland":
-      offset = 30;
+      offset = 1.5;
+      break;
+    case "Indiana":
+    case "Massachusetts":
+    case "Maine":
+      offset = 1;
       break;
     default:
       break;
   }
 
-  selectClass.style.setProperty("--x", translateX - offset + "px");
-  selectClass.style.setProperty("--y", translateY + "px");
+  if (selectClass) {
+    selectClass.style.setProperty("--x", translateXvw - offset + "vw");
+    selectClass.style.setProperty("--y", translateYvh + "vh");
+  }
 }
 
 /*
