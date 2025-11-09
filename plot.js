@@ -21,18 +21,22 @@ const svg = d3
 
 const svg_state = d3
   .select("#state-chart")
-  .append("svg")
-  .attr("viewBox", `0 0 ${width} ${height}`)
-  .style("overflow", "visible");
+  //.append("svg")
+  .attr("viewBox", `${width} ${-height / 10} ${width * 1.25} ${height * 1.25}`)
+  .style("overflow", "visible")
+  .style("display", "none");
 
 const tooltip = d3.select("#tooltip");
 const stateName = document.querySelector("#state-name");
 
 const geoURL =
   "https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json";
-const dataURL = "avg_states_model.csv"; // <-- your CSV filename
+const dataURL = "new_avg_states_model.csv"; // <-- your CSV filename
 
-var plotName, legendColor;
+var plotName;
+var selectedState = [];
+var isSelected = false;
+var legendVisible = true;
 
 Promise.all([d3.json(geoURL), d3.csv(dataURL)]).then(([geo, data]) => {
   // cast numeric
@@ -79,8 +83,8 @@ Promise.all([d3.json(geoURL), d3.csv(dataURL)]).then(([geo, data]) => {
   //const colors = d3.schemeSpectral[9].slice().reverse();
   const color = d3
     .scaleThreshold()
-    .domain([-20, -15, -10, -5, 0, 5, 10, 15, 20])
-    .range(d3.schemeRdYlBu[10].reverse());
+    .domain([3, 6, 9, 12, 15, 18, 21, 24])
+    .range(d3.schemeRdYlBu[9].reverse());
   /*.scaleQuantile()
     .domain(data.map((d) => d.tas_degree))
     .range(colors);*/
@@ -106,17 +110,20 @@ Promise.all([d3.json(geoURL), d3.csv(dataURL)]).then(([geo, data]) => {
     .attr("class", "states")
     .on("mouseenter", (event) => {
       hoverOver(event.currentTarget);
-      let hoverColor=event.currentTarget.getAttribute('fill');
-      d3.select("#legend").selectAll('rect').nodes().forEach((d)=>{
-        if(d.getAttribute('fill')===hoverColor){
-          hoverOver(d);
-          legendHover=d;
-        }
-      });
+      let hoverColor = event.currentTarget.getAttribute("fill");
+      d3.select("#legend")
+        .selectAll("rect")
+        .nodes()
+        .forEach((d) => {
+          if (d.getAttribute("fill") === hoverColor) {
+            hoverOver(d);
+            legendHover = d;
+          }
+        });
     })
     .on("mouseleave", (event) => {
       hoverOut(event.currentTarget);
-      if(legendHover){
+      if (legendHover) {
         hoverOut(legendHover);
       }
     });
@@ -163,6 +170,26 @@ Promise.all([d3.json(geoURL), d3.csv(dataURL)]).then(([geo, data]) => {
           name +
           " (2015 ~ 2100)";
         subplot(filtered);
+
+        //console.log(event.currentTarget);
+        if (selectedState.length == 0) {
+          selectedState.push(event.currentTarget);
+        }
+        if (isSelected) {
+          if (event.currentTarget.classList.contains("selected")) {
+            event.currentTarget.classList.remove("selected");
+            isSelected = false;
+            selectState();
+            selectedState.pop();
+          }
+        } else {
+          if (!event.currentTarget.classList.contains("selected")) {
+            event.currentTarget.classList.add("selected");
+            isSelected = true;
+            selectState();
+            moveStateToLeft(selectedState[0]);
+          }
+        }
       });
   }
 
@@ -180,18 +207,34 @@ Promise.all([d3.json(geoURL), d3.csv(dataURL)]).then(([geo, data]) => {
   update();
 });
 
-// color = d3.scaleQuantile() or d3.scaleThreshold()
+function selectState() {
+  d3.select("#chart")
+    .selectAll("path")
+    .nodes()
+    .forEach((s) => {
+      if (s != selectedState[0]) {
+        if (selectedState[0].classList.contains("selected")) {
+          d3.select(s).style("opacity", "0");
+          d3.select(s).style("visibility", "hidden");
+        } else {
+          d3.select(s).style("opacity", "1");
+          d3.select(s).style("visibility", "visible");
+        }
+      }
+    });
+  legendVisible = !legendVisible;
+  d3.select("#legend")
+    .style("opacity", legendVisible ? 1 : 0)
+    .style("visibility", legendVisible ? "visible" : "hidden");
+  svg_state.style("display", legendVisible ? "none" : "block");
+}
 
 function hoverOver(target) {
-  d3.select(target)
-    .style("fill-opacity", 1)
-    .style("stroke-width", 1);
+  d3.select(target).style("fill-opacity", 1).style("stroke-width", 1.5);
 }
 
 function hoverOut(target) {
-  d3.select(target)
-    .style("fill-opacity", 0.7)
-    .style("stroke-width", 0.5);
+  d3.select(target).style("fill-opacity", 0.7).style("stroke-width", 0.5);
 }
 
 function makeLegend(colorScale) {
@@ -206,11 +249,12 @@ function makeLegend(colorScale) {
     .select("#legend")
     .attr("width", 100 + labelOffset)
     .attr("height", range.length * boxH)
+    .style("transition", "200ms")
     .style("overflow", "visible");
 
   // group (for top margin)
   const g = svgLengend.append("g").attr("transform", "translate(30,20)");
-  let legendHover=[];
+  let legendHover = [];
 
   // draw each box + tick label
   range.forEach((color, i) => {
@@ -226,19 +270,22 @@ function makeLegend(colorScale) {
       .attr("class", "states")
       .on("mouseenter", (event) => {
         hoverOver(event.currentTarget);
-        d3.select("#chart").selectAll('path').nodes().forEach((d)=>{
-          if(d.getAttribute('fill')===color){
-            hoverOver(d);
-            legendHover.push(d);
-          }
-        });
+        d3.select("#chart")
+          .selectAll("path")
+          .nodes()
+          .forEach((d) => {
+            if (d.getAttribute("fill") === color) {
+              hoverOver(d);
+              legendHover.push(d);
+            }
+          });
       })
       .on("mouseleave", (event) => {
         hoverOut(event.currentTarget);
-        legendHover.forEach((c)=>{
+        legendHover.forEach((c) => {
           hoverOut(c);
         });
-        legendHover=[];
+        legendHover = [];
       });
 
     // label: use threshold boundary for the lower edge except first/last
@@ -304,3 +351,116 @@ function subplot(stateData) {
     .attr("stroke", "steelblue")
     .attr("stroke-width", 2);
 }
+
+function moveStateToLeft(selection) {
+  const container = d3.select("#chart");
+  const containerWidth = container.node().getBoundingClientRect().width;
+
+  // Calculate target position as percentage of container
+  const targetX = containerWidth * 0.1; // 10% from left
+  const targetY = 300; // Fixed y or calculate dynamically
+
+  // Get state's bounding box
+  const bbox = selection.getBBox();
+  const currentCenterX = bbox.x + bbox.width / 2;
+  const currentCenterY = bbox.y + bbox.height / 2;
+
+  const translateX = targetX - currentCenterX;
+  const translateY = targetY - currentCenterY;
+
+  const selectClass = document.querySelector(".selected");
+
+  let offset = 0;
+  switch (plotName) {
+    case "California":
+      offset = 75;
+      break;
+    case "Montana":
+    case "Texas":
+      offset = 100;
+      break;
+    case "Nevada":
+    case "Idaho":
+    case "New York":
+      offset = 50;
+      break;
+    case "Utah":
+      offset = 30;
+      break;
+    case "Arizona":
+    case "New Mexico":
+      offset = 40;
+      break;
+    case "Oregon":
+    case "Washington":
+    case "Colorado":
+    case "Minnesota":
+    case "Wyoming":
+      offset = 60;
+      break;
+    case "Oklahoma":
+    case "Nebraska":
+    case "Florida":
+    case "North Carolina":
+      offset = 80;
+      break;
+    case "Kansas":
+    case "South Dakota":
+    case "North Dakota":
+    case "Tennessee":
+    case "Michigan":
+    case "Kentucky":
+    case "Virginia":
+      offset = 70;
+      break;
+    case "Iowa":
+    case "Missouri":
+      offset = 50;
+      break;
+    case "Arkansas":
+    case "Louisiana":
+    case "Mississippi":
+      offset = 30;
+      break;
+    case "Illinois":
+    case "Wisconsin":
+    case "Pennsylvania":
+      offset = 40;
+      break;
+    case "Indiana":
+    case "Massachusetts":
+    case "Maine":
+      offset = 20;
+      break;
+    case "Alabama":
+    case "Georgia":
+    case "South Carolina":
+    case "West Virginia":
+    case "Ohio":
+    case "Maryland":
+      offset = 30;
+      break;
+    default:
+      break;
+  }
+
+  selectClass.style.setProperty("--x", translateX - offset + "px");
+  selectClass.style.setProperty("--y", translateY + "px");
+}
+
+/*
+function createBrushSelector(svg) {
+  svg.call(d3.brush().on("start brush end", brushed));
+
+  // Raise dots and everything after overlay
+  svg.selectAll(".dots, .overlay ~ *").raise();
+}
+
+function brushed(event) {
+  const selection = event.selection;
+  d3.selectAll("circle").classed("selected", (d) =>
+    isCommitSelected(selection, d)
+  );
+  renderSelectionCount(selection);
+  renderLanguageBreakdown(selection);
+}*/
