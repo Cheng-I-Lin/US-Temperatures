@@ -191,15 +191,15 @@ Promise.all([d3.json(geoURL), d3.csv(dataURL)]).then(([geo, data]) => {
             }
           } else {
             if (!event.currentTarget.classList.contains("selected")) {
-              event.currentTarget.classList.add("selected");
-              isSelected = true;
-              selectState();
-              moveStateToLeft(selectedState[0]);
               const name = d.properties.name;
               plotName = name;
               const filtered = data.filter(
                 (d) => d.model === model && d.state === name
               );
+              event.currentTarget.classList.add("selected");
+              isSelected = true;
+              selectState();
+              moveStateToLeft(selectedState[0]);
               subplot(filtered, usSeries);
               stateName.innerHTML = "Click " + plotName + " to deselect";
             }
