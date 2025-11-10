@@ -54,6 +54,20 @@ Promise.all([d3.json(geoURL), d3.csv(dataURL)]).then(([geo, data]) => {
     .join("option")
     .text((d) => d);
 
+  // Compute U.S. mean (by year) for each model
+  const usSeriesByModel = {};
+  for (const m of models) {
+    const arr = data.filter((d) => d.model === m);
+    const rolled = d3.rollups(
+      arr,
+      (v) => d3.mean(v, (d) => d.tas_degree),
+      (d) => d.year
+    );
+    usSeriesByModel[m] = rolled
+      .map(([year, mean]) => ({ year: +year, mean: +mean }))
+      .sort((a, b) => a.year - b.year);
+  }
+
   // year slider domain from data
   const years = Array.from(new Set(data.map((d) => d.year))).sort(
     (a, b) => a - b
@@ -160,16 +174,7 @@ Promise.all([d3.json(geoURL), d3.csv(dataURL)]).then(([geo, data]) => {
       })
       .on("mouseout", () => tooltip.style("display", "none"))
       .on("click", (event, d) => {
-        const name = d.properties.name;
-        const filtered = data.filter(
-          (d) => d.model === model && d.state === name
-        );
-        plotName = name;
-        stateName.innerHTML =
-          "Average Annual Near Surface Temperature of " +
-          name +
-          " (2015 ~ 2100)";
-        subplot(filtered);
+        const usSeries = usSeriesByModel[model]; // <-- national mean for this model
 
         //console.log(event.currentTarget);
         if (event.currentTarget.getAttribute("fill") != "#ccc") {
@@ -182,6 +187,7 @@ Promise.all([d3.json(geoURL), d3.csv(dataURL)]).then(([geo, data]) => {
               isSelected = false;
               selectState();
               selectedState.pop();
+              stateName.innerHTML = "Click a state to see temperature data aggregated by the chosen state";
             }
           } else {
             if (!event.currentTarget.classList.contains("selected")) {
@@ -189,6 +195,13 @@ Promise.all([d3.json(geoURL), d3.csv(dataURL)]).then(([geo, data]) => {
               isSelected = true;
               selectState();
               moveStateToLeft(selectedState[0]);
+              const name = d.properties.name;
+              plotName = name;
+              const filtered = data.filter(
+                (d) => d.model === model && d.state === name
+              );
+              subplot(filtered, usSeries);
+              stateName.innerHTML = "Click " + plotName + " to deselect";
             }
           }
         }
@@ -202,7 +215,8 @@ Promise.all([d3.json(geoURL), d3.csv(dataURL)]).then(([geo, data]) => {
       const filtered = data.filter(
         (d) => d.model === event.target.value && d.state === plotName
       );
-      subplot(filtered);
+      const usSeries = usSeriesByModel[event.target.value];
+      subplot(filtered, usSeries);
     }
   });
   d3.select("#yearSlider").on("input", update);
@@ -317,41 +331,209 @@ function makeLegend(colorScale) {
     .text("Temperature (°C)");
 }
 
-function subplot(stateData) {
-  svg_state.selectAll("path").remove();
-  svg_state.selectAll("g").remove();
-  const line = d3
+function subplot(stateData, usSeries) {
+  svg_state.selectAll("*").remove();
+
+  // --- Margins and inner dimensions ---
+  // ↑ Increased top margin from 40 → 70 to give space for title & summary
+  const margin = { top: 70, right: 40, bottom: 60, left: 70 },
+    innerWidth = width - margin.left - margin.right,
+    innerHeight = height - margin.top - margin.bottom;
+
+  const g = svg_state
+    .append("g")
+    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+  // --- Scales ---
+  const x = d3
+    .scaleLinear()
+    .domain(
+      d3.extent(
+        d3.merge([stateData.map((d) => d.year), usSeries.map((d) => d.year)])
+      )
+    )
+    .range([0, innerWidth])
+    .nice();
+
+  const allTemps = [
+    ...stateData.map((d) => d.tas_degree),
+    ...usSeries.map((d) => d.mean),
+  ];
+  const y = d3
+    .scaleLinear()
+    .domain([d3.min(allTemps) - 0.3, d3.max(allTemps) + 0.3])
+    .range([innerHeight, 0])
+    .nice();
+
+  // --- Axes ---
+  g.append("g")
+    .attr("transform", `translate(0,${innerHeight})`)
+    .call(d3.axisBottom(x).tickFormat(d3.format("d")))
+    .call((g) =>
+      g
+        .append("text")
+        .attr("x", innerWidth / 2)
+        .attr("y", 45)
+        .attr("fill", "black")
+        .attr("text-anchor", "middle")
+        .attr("font-size", 14)
+        .text("Year")
+    );
+
+  g.append("g")
+    .call(d3.axisLeft(y))
+    .call((g) =>
+      g
+        .append("text")
+        .attr("x", -innerHeight / 2)
+        .attr("y", -50)
+        .attr("transform", "rotate(-90)")
+        .attr("fill", "black")
+        .attr("text-anchor", "middle")
+        .attr("font-size", 14)
+        .text("Temperature (°C)")
+    );
+
+  // --- Gridlines ---
+  g.append("g")
+    .call(d3.axisLeft(y).tickSize(-innerWidth).tickFormat(""))
+    .attr("stroke-opacity", 0.08);
+
+  // --- Line generators ---
+  const stateLine = d3
     .line()
     .x((d) => x(d.year))
-    .y((d) => y(d.tas_degree));
+    .y((d) => y(d.tas_degree))
+    .curve(d3.curveMonotoneX);
 
-  const x = d3.scaleLinear().range([0, width]).nice();
-  const y = d3.scaleLinear().range([height, 0]).nice();
-  //console.log(stateData);
+  const usLine = d3
+    .line()
+    .x((d) => x(d.year))
+    .y((d) => y(d.mean))
+    .curve(d3.curveMonotoneX);
 
-  const years = d3.extent(stateData, (d) => d.year);
-  const temps = d3.extent(stateData, (d) => d.tas_degree);
-
-  x.domain(years);
-  y.domain([temps[0] - 0.3, temps[1] + 0.3]);
-
-  svg_state
-    .append("g")
-    .attr("transform", `translate(0,${height})`)
-    .call(d3.axisBottom(x).tickFormat(d3.format("d")));
-
-  svg_state
-    .append("g")
-    .attr("transform", `translate(0,0)`)
-    .call(d3.axisLeft(y));
-
-  const path = svg_state
-    .append("path")
-    .datum(stateData)
-    .attr("d", line)
+  // --- Draw lines ---
+  g.append("path")
+    .datum(usSeries)
     .attr("fill", "none")
-    .attr("stroke", "steelblue")
-    .attr("stroke-width", 2);
+    .attr("stroke", "#444")
+    .attr("stroke-width", 2)
+    .attr("stroke-dasharray", "6 4")
+    .attr("d", usLine);
+
+  g.append("path")
+    .datum(stateData)
+    .attr("fill", "none")
+    .attr("stroke", "#007acc")
+    .attr("stroke-width", 2.5)
+    .attr("d", stateLine);
+
+  // --- Compute linear trends ---
+  function linearTrend(data, xKey, yKey) {
+    const n = data.length;
+    const sumX = d3.sum(data, (d) => d[xKey]);
+    const sumY = d3.sum(data, (d) => d[yKey]);
+    const sumXY = d3.sum(data, (d) => d[xKey] * d[yKey]);
+    const sumXX = d3.sum(data, (d) => d[xKey] * d[xKey]);
+    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+    return { slope, intercept };
+  }
+
+  const trendState = linearTrend(stateData, "year", "tas_degree");
+  const trendUS = linearTrend(usSeries, "year", "mean");
+
+  const slopeStateDecade = trendState.slope * 10;
+  const slopeUSDecade = trendUS.slope * 10;
+
+  const compare =
+    slopeStateDecade > slopeUSDecade
+      ? "Rising faster than the U.S. average"
+      : "Rising slower than the U.S. average";
+
+  // --- Title ---
+  g.append("text")
+    .attr("x", innerWidth / 2)
+    .attr("y", -40) // was -10 → moved up to fit new margin
+    .attr("text-anchor", "middle")
+    .attr("font-size", 16)
+    .attr("font-weight", "bold")
+    .text(
+      "Average Annual Near Surface Temperature of " +
+        plotName +
+        " (2015 ~ 2100)"
+    );
+
+  // --- Summary text under title ---
+  g.append("text")
+    .attr("x", innerWidth / 2)
+    .attr("y", -18) // was 15 → moved above the chart area
+    .attr("text-anchor", "middle")
+    .attr("font-size", 13)
+    .attr("fill", "#555")
+    .text(
+      `${stateData[0].state} warming at ${slopeStateDecade.toFixed(
+        2
+      )}°C per decade under ${
+        stateData[0].model
+      } (2015–2100). ${compare} (${slopeUSDecade.toFixed(2)}°C).`
+    );
+
+  /*g.append("path")
+    .datum(trendLineState)
+    .attr("fill", "none")
+    .attr("stroke", "#007acc")
+    .attr("stroke-dasharray", "4 4")
+    .attr("stroke-width", 1.5)
+    .attr("opacity", 0.7)
+    .attr("d", stateLine);*/
+
+  // --- Legend (top-left corner) ---
+  const legend = g.append("g").attr("transform", `translate(10, 10)`);
+
+  // background box
+  legend
+    .append("rect")
+    .attr("x", -5)
+    .attr("y", -5)
+    .attr("width", 140)
+    .attr("height", 45)
+    .attr("fill", "white")
+    .attr("stroke", "#ccc")
+    .attr("opacity", 0.8);
+
+  // state line
+  legend
+    .append("line")
+    .attr("x1", 0)
+    .attr("x2", 24)
+    .attr("y1", 8)
+    .attr("y2", 8)
+    .attr("stroke", "#007acc")
+    .attr("stroke-width", 2.5);
+  legend
+    .append("text")
+    .attr("x", 32)
+    .attr("y", 12)
+    .attr("font-size", 12)
+    .text("State");
+
+  // US mean line
+  legend
+    .append("line")
+    .attr("x1", 0)
+    .attr("x2", 24)
+    .attr("y1", 28)
+    .attr("y2", 28)
+    .attr("stroke", "#444")
+    .attr("stroke-width", 2)
+    .attr("stroke-dasharray", "6 4");
+  legend
+    .append("text")
+    .attr("x", 32)
+    .attr("y", 32)
+    .attr("font-size", 12)
+    .text("U.S. mean");
 }
 
 function moveStateToLeft(selection) {
